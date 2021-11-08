@@ -10,6 +10,8 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import os
 import csv
+import pandas as pd
+from collections import defaultdict
 from tqdm import tqdm
 
 
@@ -21,15 +23,14 @@ class Config():
     batch_size = 4
     hidden_size = 30
     num_layers = 3
-    # 预测长度10
-    out_len = 6
-    # 输入长度
-    input_len = 40
-    lr = 0.01
+    out_len = 6 # 预测长度10
+    input_len = 40   # 输入长度
+    data_len=out_len+input_len
+    lr = 0.0002
     start_epoch = 0
     epochs = 15
     pt_path = 'model.pt'
-    best = 0
+    best = 0.2492
 
 
 config = Config()
@@ -41,64 +42,53 @@ class CCFData(Dataset):
     
     @classmethod
     def read_csv(cls):
-        with open('train.csv', 'r') as f:
-            reader = csv.reader(f)
-            csv_data = list(reader)  # 将数据空间转换成嵌套列表
-            # 遍历列表（跳过表头），将列表里的数据转换成浮点数，便于后续处理
-            l = config.out_len + config.input_len
-            i = 1
-            print(len(csv_data))
-            while i < len(csv_data):
-                if i + l > len(csv_data):
-                    break
-                if int(csv_data[i + l][5]) - int(csv_data[i][5]) < 100:  #:and \
-                    # csv_data[i+l][0]==csv[i][0]
-                    data_cell_in = [[float(csv_data[i + j][k]) for k in range(1, 5)] for j in
-                                    range(config.input_len )]
-                    data_cell_out = [[float(csv_data[i + j][0]), float(csv_data[i + j][1])] for j in
-                                     range(config.input_len + 1, l + 1)]
-                    
-                    cls._data.append([data_cell_in, data_cell_out])
-                    i += 1
-                else:
-                    if int(csv_data[i][0]) - int(csv_data[i - 1][0]) == 1 and \
-                            int(csv_data[i][0]) >= 27:
-                        data_cell_in = [[float(csv_data[i + j][k]) for k in range(1, 5)] for j in
-                                        range(config.input_len + 1)]
-                        data_cell_out = [[float(csv_data[i + j][1]), float(csv_data[i + j][2])] for j in
-                                         range(config.input_len + 1, l + 1)]
-                        cls._pred.append([data_cell_in, data_cell_out])
-                        i += l
-                    else:
-                        i += 1
+        train_csv = pd.read_csv('train.csv')
+        mmsi = train_csv['mmsi']
+        lat = train_csv['lat']
+        lon = train_csv['lon']
+        sog = train_csv['Sog']
+        cog = train_csv['Cog']
+        mmsi_dict = defaultdict(list)
+        for i in range(len(mmsi)):
+            mmsi_dict[mmsi[i]].append([lat[i], lon[i], sog[i], cog[i]])
+            
+        def spllit_each_mmsi(data, m=0):
+            ret = []
+            for i in range(len(data) - config.data_len+1):
+                cell_in = data[i:i + 40]
+                cell_out = [[data[j][0], data[j][1]] for j in range(i + config.input_len, i + config.data_len)]
+                if m < 27:
+                    ret.append([cell_in, cell_out])
+                elif m >= 27:
+                    ret.append([cell_in, cell_out, m])
+            return ret
+    
+        for m in mmsi_dict:
+            if m < 27:
+                cls._data.extend(spllit_each_mmsi(mmsi_dict[m]))
+            elif m >= 27:
+                cls._data.extend(spllit_each_mmsi(mmsi_dict[m][:-46]))
+                cls._pred.extend(spllit_each_mmsi(mmsi_dict[m][-46:], m))
     
     def __init__(self, mode='train'):
         super(CCFData, self).__init__()
-        # if self._data == []:
-        #     self.read_csv()
-        # self.n = len(self._data)
-        # if mode == 'train':
-        #     self.data = self._data[:int(0.8 * self.n)]
-        # elif mode == 'eval':
-        #     self.data = self._data[int(0.8 * self.n):]
-        # elif mode == 'pred':
-        #     self.data = self._pred
-        self.data=[]
-        l = config.out_len + config.input_len
-        with open("train.csv",'r') as f:
-            reader = csv.reader(f)
-            csv_data = list(reader)
-            for i in range(1,60):
-                data_cell_in = [[float(csv_data[i + j][k]) for k in range(1, 5)] for j in
-                                range(config.input_len )]
-                data_cell_out = [[float(csv_data[i + j][0]), float(csv_data[i + j][1])] for j in
-                                 range(config.input_len + 1, l + 1)]
-    
-                self.data.append([data_cell_in, data_cell_out])
+        if self._data == []:
+            self.read_csv()
+        self.n = len(self._data)
+        self.mode=mode
+        if mode == 'train':
+            self.data = self._data[:int(0.8 * self.n)]
+        elif mode == 'test':
+            self.data = self._data[int(0.8 * self.n):]
+        elif mode == 'pred':
+            self.data = self._pred
         
     def __getitem__(self, idx):
-        return torch.tensor(self.data[idx][0]), torch.tensor(self.data[idx][1])
-    
+        if self.mode!='pred':
+            return torch.tensor(self.data[idx][0]).double(), torch.tensor(self.data[idx][1]).double()
+        else:
+            return torch.tensor(self.data[idx][0]).double(), torch.tensor(self.data[idx][1]).double(),self.data[idx][2]
+            
     def __len__(self):
         return len(self.data)
 
@@ -157,6 +147,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 
 # device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 device = torch.device('cpu')
+model.double()
 model.to(device)
 criterion.to(device)
 if os.path.exists(config.pt_path):
@@ -170,7 +161,7 @@ def train(epoch):
                               drop_last=True,
                               batch_size=config.batch_size)
     tbar = tqdm(train_loader)
-    
+    total_loss=0
     for idx, (data_in, data_out) in enumerate(tbar):
         data_in, data_out = data_in.to(device), data_out.to(device)
         # h, c = model.init_h_c()
@@ -179,9 +170,10 @@ def train(epoch):
         #out = model(data_in, (h, c))
         out = model(data_in)
         loss = criterion(out, data_out)
+        total_loss+=loss.item()
         loss.backward()
         optimizer.step()
-        tbar.set_description('Epoch:%d  loss:%.6f ' % (epoch, loss.item()))
+        tbar.set_description('Epoch %d : loss:%.6f total_loss:%.6f' % (epoch, loss.item(),total_loss))
 
 def test():
     score = 0
@@ -203,7 +195,7 @@ def test():
             s = 1 - loss.item()
             total_score += s
             score = total_score / ((idx+1) * config.batch_size)
-            tbar.set_description('Val: loss:%.6f score:%.6f' % (loss.item(), score))
+            tbar.set_description('Val: loss:%.6f score:%.6f' % (loss.item(), s))
     return score
 
 def writer_csv(out):
@@ -220,8 +212,7 @@ def pred():
     out_csv=[['mmsi','lat','lon']]
     with torch.no_grad():
         tbar = tqdm(pred_loader)
-        for idx, (data_in, data_out) in enumerate(tbar):
-            mmsi='28'
+        for idx, (data_in, data_out,mmsi) in enumerate(tbar):
             data_in, data_out = data_in.to(device), data_out.to(device)
             out = model(data_in)
             tbar.set_description('Pred...')
@@ -229,7 +220,7 @@ def pred():
             for lat,lon in out:
                 lat=str(lat.item())
                 lon = str(lon.item())
-                out_csv.append([mmsi,lat,lon])
+                out_csv.append([str(mmsi.item()),lat,lon])
     writer_csv(out_csv)
             
     
@@ -250,17 +241,21 @@ if __name__ == '__main__':
     
     train_data=CCFData()
     # a=len(train_data)
-    test_data=CCFData()
+    test_data=CCFData('test')
     # b=len(test_data)
-    pred_data=CCFData()
+    pred_data=CCFData('pred')
     # c=len(pred_data)
     # print(a,b,c,a+b+c)
     
-    for epoch in range(config.start_epoch,config.start_epoch+config.epochs):
-        break
-        train(epoch)
-        if (epoch-config.start_epoch)%3==0:
-            best=test()
-            if best>config.best:
+    #for epoch in range(config.start_epoch,config.start_epoch+config.epochs):
+    best=config.best
+    for epoch in range(8,8+7):
+        #break
+        #train(epoch)
+        if (epoch-config.start_epoch)%1==0:
+            score=test()
+            if score>best:
+                best=score
                 torch.save(model.state_dict(), config.pt_path)
+                print("Save model...")
     pred()

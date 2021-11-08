@@ -205,10 +205,73 @@ def split_train_last6():
         writer.writerows(out)
 
 
+def prepare_dataset():
+    import pandas as pd
+    from itertools import chain
+    from collections import defaultdict
+    from pprint import pprint
+    train_csv = pd.read_csv('train.csv')
+    mmsi = train_csv['mmsi']
+    lat = train_csv['lat']
+    lon = train_csv['lon']
+    sog = train_csv['Sog']
+    cog = train_csv['Cog']
+    mmsi_dict = defaultdict(list)
+    for i in range(len(mmsi)):
+        mmsi_dict[mmsi[i]].append([lat[i], lon[i], sog[i], cog[i]])
+    _data = []
+    _pred = []
+    
+    def spllit_each_mmsi(data,m=0):
+        ret = []
+        for i in range(len(data) - 45):
+            cell_in = data[i:i + 40]
+            cell_out = [[data[j][0], data[j][1]] for j in range(i + 40, i + 46)]
+            if m<27:
+                ret.append([cell_in, cell_out])
+            elif m>=27:
+                ret.append([cell_in, cell_out,m])
+        return ret
+    
+    for m in mmsi_dict:
+        if m < 27:
+            _data.extend(spllit_each_mmsi(mmsi_dict[m]))
+        elif m >= 27:
+            _data.extend(spllit_each_mmsi(mmsi_dict[m][:-46]))
+            _pred.extend(spllit_each_mmsi(mmsi_dict[m][-46:],m))
+    
+    pprint(_data[0])
+    #pprint(_pred[0])
+    #exit(0)
+    # data_list_4 = list(chain.from_iterable(zip(lat, lon, sog, cog)))
+    # data1 = [data_list_4[i:i + n] for i in range(0, len(data_list), 4)]
+
+    # def sepmmsi():
+    #     for i in mmsidata:
+    #         while i == 1:
+    #             list_i = list.append(lat[i])
+    #             list_i = list.append(lon[i])
+    #             list_i = list.append(sog[i])
+    #             list_i = list.append(cog[i])
+    #         i = i + 1
+    
+    # def data46():
+    #     for m in list_i:
+    #         pass
+    #
+    # def seqdata():
+    #     for i in data46.index:
+    #         if i > 40:
+    #             list_i.pop(sog)
+    #             list_i.pop(cog)
+    #     return list_i
+
+
 if __name__ == '__main__':
     #vis_html()
     #compare_train_test_time()
-    split_train_last6()
+    #split_train_last6()
+    prepare_dataset()
     
     
     
