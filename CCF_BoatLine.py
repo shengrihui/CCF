@@ -26,11 +26,11 @@ class Config():
     out_len = 6 # 预测长度10
     input_len = 40   # 输入长度
     data_len=out_len+input_len
-    lr = 0.0002
+    lr = 0.0001
     start_epoch = 0
     epochs = 15
     pt_path = 'model.pt'
-    best = 0.2492
+    best = 0.0
 
 
 config = Config()
@@ -142,11 +142,11 @@ model = Model(
     out_size=config.out_size
 )
 
-criterion = nn.MSELoss()
+criterion = nn.MSELoss(reduction='sum')
 optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 
-# device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-device = torch.device('cpu')
+device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#device = torch.device('cpu')
 model.double()
 model.to(device)
 criterion.to(device)
@@ -177,7 +177,7 @@ def train(epoch):
 
 def test():
     score = 0
-    total_score = 0
+    total_loss = 0
     test_loader = DataLoader(dataset=test_data,
                              shuffle=False,
                              drop_last=False,
@@ -192,10 +192,10 @@ def test():
             #out = model(data_in, (h, c))
             out = model(data_in)
             loss = criterion(out, data_out)
-            s = 1 - loss.item()
-            total_score += s
-            score = total_score / ((idx+1) * config.batch_size)
-            tbar.set_description('Val: loss:%.6f score:%.6f' % (loss.item(), s))
+            total_loss += loss.item()
+            mse=total_loss/((idx+1) * config.batch_size*config.out_len)
+            score =1/(mse+1)
+            tbar.set_description('Val: loss:%.6f score:%.6f' % (loss.item(), score))
     return score
 
 def writer_csv(out):
@@ -210,6 +210,8 @@ def pred():
                              num_workers=1,
                              batch_size=1)
     out_csv=[['mmsi','lat','lon']]
+    total_loss=0
+    LOSS=0
     with torch.no_grad():
         tbar = tqdm(pred_loader)
         for idx, (data_in, data_out,mmsi) in enumerate(tbar):
@@ -217,10 +219,16 @@ def pred():
             out = model(data_in)
             tbar.set_description('Pred...')
             out=torch.squeeze(out)
+            loss=criterion(out,data_out)
+            total_loss+=loss.item()
             for lat,lon in out:
                 lat=str(lat.item())
                 lon = str(lon.item())
                 out_csv.append([str(mmsi.item()),lat,lon])
+            
+    mse=total_loss/(len(pred_data)*config.out_len*2)
+    score=1/(mse+1)
+    print(score)
     writer_csv(out_csv)
             
     
@@ -240,18 +248,15 @@ if __name__ == '__main__':
     # loss = criterion(out, y)
     
     train_data=CCFData()
-    # a=len(train_data)
     test_data=CCFData('test')
-    # b=len(test_data)
     pred_data=CCFData('pred')
-    # c=len(pred_data)
-    # print(a,b,c,a+b+c)
+    print(len(pred_data))
     
     #for epoch in range(config.start_epoch,config.start_epoch+config.epochs):
     best=config.best
-    for epoch in range(8,8+7):
-        #break
-        #train(epoch)
+    for epoch in range(14,14+7):
+        break
+        train(epoch)
         if (epoch-config.start_epoch)%1==0:
             score=test()
             if score>best:
