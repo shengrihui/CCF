@@ -240,8 +240,10 @@ def prepare_dataset():
             _data.extend(spllit_each_mmsi(mmsi_dict[m][:-46]))
             _pred.extend(spllit_each_mmsi(mmsi_dict[m][-46:],m))
     
-    pprint(_data[0])
-    #pprint(_pred[0])
+    #pprint(_data[0])
+    pprint(_pred[-1][1])
+    print(lat[-6:])
+    
     #exit(0)
     # data_list_4 = list(chain.from_iterable(zip(lat, lon, sog, cog)))
     # data1 = [data_list_4[i:i + n] for i in range(0, len(data_list), 4)]
