@@ -27,13 +27,15 @@ class Config():
     out_len = 6  # 预测长度10
     input_len = 40  # 输入长度
     data_len = out_len + input_len
-    lr = 0.0001
-    start_epoch = 30
+    
+    lr = 0.000001
+    start_epoch = 80
     epochs = 10
-    save_dir = '01'
+    save_dir = '02'
     pt_path = f'{save_dir}/model.pt'
     logs = f'{save_dir}/logs/'
-    best = 0.9947788483649231
+    best = 0.9947640643509494
+
 
 config = Config()
 if not os.path.exists(config.save_dir):
@@ -53,14 +55,20 @@ class CCFData(Dataset):
         lon = train_csv['lon']
         sog = train_csv['Sog']
         cog = train_csv['Cog']
+        time = train_csv['timestamp']
         mmsi_dict = defaultdict(list)
         for i in range(len(mmsi)):
-            mmsi_dict[mmsi[i]].append([lat[i], lon[i], sog[i], cog[i]])
+            mmsi_dict[mmsi[i]].append([lat[i], lon[i], sog[i], cog[i], time[i]])
         
         def spllit_each_mmsi(data, m=0):
             ret = []
             for i in range(len(data) - config.data_len + 1):
-                cell_in = data[i:i + 40]
+                try:
+                    if abs(data[i + config.data_len + 1][4] - data[i + config.data_len + 1][4]) > 100:
+                        continue
+                except:
+                    pass
+                cell_in = [[data[k][j] for j in range(4)] for k in range(i, i + config.input_len)]
                 cell_out = [[data[j][0], data[j][1]] for j in range(i + config.input_len, i + config.data_len)]
                 if m < 27:
                     ret.append([cell_in, cell_out])
@@ -255,7 +263,7 @@ if __name__ == '__main__':
     test_data = CCFData('test')
     pred_data = CCFData('pred')
     writer = SummaryWriter(config.logs)
-    
+
     best = config.best
     for epoch in range(config.start_epoch, config.start_epoch + config.epochs):
         # break
@@ -268,4 +276,7 @@ if __name__ == '__main__':
                 print("Save model...")
     pred()
     print('best', best)
+
+    torch.save(model.state_dict(), config.pt_path)
+    print("Save model...")
 

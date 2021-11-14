@@ -216,16 +216,22 @@ def prepare_dataset():
     lon = train_csv['lon']
     sog = train_csv['Sog']
     cog = train_csv['Cog']
+    time=train_csv['timestamp']
     mmsi_dict = defaultdict(list)
     for i in range(len(mmsi)):
-        mmsi_dict[mmsi[i]].append([lat[i], lon[i], sog[i], cog[i]])
+        mmsi_dict[mmsi[i]].append([lat[i], lon[i], sog[i], cog[i],time[i]])
     _data = []
     _pred = []
     
     def spllit_each_mmsi(data,m=0):
         ret = []
         for i in range(len(data) - 45):
-            cell_in = data[i:i + 40]
+            try:
+                if abs(data[i+46][4]-data[i+46+1][4])>100:
+                    continue
+            except:
+                pass
+            cell_in = data[i:i + 40][:3]
             cell_out = [[data[j][0], data[j][1]] for j in range(i + 40, i + 46)]
             if m<27:
                 ret.append([cell_in, cell_out])
@@ -268,12 +274,33 @@ def prepare_dataset():
     #             list_i.pop(cog)
     #     return list_i
 
-
+def Score():
+    ans=pd.read_csv('answer.csv')
+    ret=pd.read_csv('result.csv')
+    ans_lat=ans['lat']
+    ans_lon=ans['lon']
+    ret_lat=ret['lat']
+    ret_lon=ret['lon']
+    mse=0
+    for i,j in zip(ret_lon,ans_lon):
+        mse+=(i-j)**2
+    for i,j in zip(ret_lat,ans_lat):
+        mse+=(i-j)**2
+    mse=mse/6
+    score=1/(1+mse)
+    print(score)
+    #
+    # for i in ret_lon.index:
+    #     print(ret_lon[i]-ans_lon[i],ret_lat[i]-ans_lat[i])
+    
+    
+    
 if __name__ == '__main__':
     #vis_html()
     #compare_train_test_time()
     #split_train_last6()
-    prepare_dataset()
+    #prepare_dataset()
+    Score()
     
     
     

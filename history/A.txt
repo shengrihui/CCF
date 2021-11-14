@@ -1,0 +1,16 @@
+01
+ input_size = 4
+    # 输出维度2，精度纬度
+    out_size = 2
+    batch_size = 4
+    hidden_size = 30
+    num_layers = 3
+    out_len = 6  # 预测长度10
+    input_len = 40 
+
+02
+划分出不同的时间段
+
+03
+划分时间段的部分有误，重新修改，之前dataloader里是2843，现在是2819
+更新计分规则
