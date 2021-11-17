@@ -8,6 +8,7 @@ Created on  2021/10/26 20:16
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
 import os
 import csv
 import pandas as pd
@@ -22,20 +23,20 @@ class Config():
     # 输出维度2，精度纬度
     out_size = 2
     batch_size = 4
-    hidden_size = 30
-    num_layers = 3
+    hidden_size = 20
+    num_layers = 4
     out_len = 6  # 预测长度10
-    input_len = 40  # 输入长度
+    input_len = 30  # 输入长度
     data_len = out_len + input_len
     
-    lr = 0.000001
-    start_epoch = 80
-    epochs = 10
-    save_dir = '02'
+    lr = 0.000002
+    momentum = 0.8
+    start_epoch = 100
+    epochs = 20
+    save_dir = '07'
     pt_path = f'{save_dir}/model.pt'
     logs = f'{save_dir}/logs/'
-    best = 0.9947640643509494
-
+    best =0.8900048504834401
 
 config = Config()
 if not os.path.exists(config.save_dir):
@@ -59,29 +60,33 @@ class CCFData(Dataset):
         mmsi_dict = defaultdict(list)
         for i in range(len(mmsi)):
             mmsi_dict[mmsi[i]].append([lat[i], lon[i], sog[i], cog[i], time[i]])
-        
+
         def spllit_each_mmsi(data, m=0):
             ret = []
-            for i in range(len(data) - config.data_len + 1):
+            i = 0
+            while i < len(data):
                 try:
-                    if abs(data[i + config.data_len + 1][4] - data[i + config.data_len + 1][4]) > 100:
+                    if abs(data[i + config.data_len + 1][4] - data[i + config.data_len ][4]) > 100:
+                        i += config.data_len
                         continue
                 except:
-                    pass
+                    if i + config.data_len > len(data):
+                        break
                 cell_in = [[data[k][j] for j in range(4)] for k in range(i, i + config.input_len)]
                 cell_out = [[data[j][0], data[j][1]] for j in range(i + config.input_len, i + config.data_len)]
                 if m < 27:
                     ret.append([cell_in, cell_out])
                 elif m >= 27:
                     ret.append([cell_in, cell_out, m])
+                i += 1
             return ret
         
         for m in mmsi_dict:
             if m < 27:
                 cls._data.extend(spllit_each_mmsi(mmsi_dict[m]))
             elif m >= 27:
-                cls._data.extend(spllit_each_mmsi(mmsi_dict[m][:-46]))
-                cls._pred.extend(spllit_each_mmsi(mmsi_dict[m][-46:], m))
+                cls._data.extend(spllit_each_mmsi(mmsi_dict[m][:-config.data_len]))
+                cls._pred.extend(spllit_each_mmsi(mmsi_dict[m][-config.data_len:], m))
     
     def __init__(self, mode='train'):
         super(CCFData, self).__init__()
@@ -122,9 +127,11 @@ class Model(nn.Module):
             batch_first=True
         )
         self.fc = nn.Sequential(
-            nn.Linear(self.input_len * self.hidden_size, self.input_len),
+            nn.Linear(self.input_len * self.hidden_size, 256),
             nn.Sigmoid(),
-            nn.Linear(self.input_len, self.out_len * self.out_size)
+            nn.Linear(256, 32),
+            nn.Sigmoid(),
+            nn.Linear(32, self.out_len * self.out_size)
         )
     
     # def forward(self, x, hidden):
@@ -153,6 +160,29 @@ model = Model(
     out_size=config.out_size
 )
 
+class My_loss(nn.Module):
+    def __init__(self):
+        super(My_loss, self).__init__()
+        self.s=[]
+        self.score=0
+        self.num=0
+        self.total_loss=0
+    def forward(self,y_hat,y):
+        for y1,y2 in zip(y_hat,y):
+            loss=F.mse_loss(y,y_hat)
+            self.num+=1
+            self.total_loss+=loss.item()
+            if self.num%60==0:
+                s=1/(self.total_loss+1)
+                self.total_loss=0
+                self.s.append(s)
+        if self.s!=[]:
+            self.score=sum(self.s)/len(self.s)
+            return self.score
+        else:
+            return 0
+
+
 criterion = nn.MSELoss(reduction='sum')
 optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 
@@ -175,23 +205,19 @@ def train(epoch):
     total_loss = 0
     for idx, (data_in, data_out) in enumerate(tbar):
         data_in, data_out = data_in.to(device), data_out.to(device)
-        # h, c = model.init_h_c()
-        # h, c = h.to(device), c.to(device)
         optimizer.zero_grad()
-        # out = model(data_in, (h, c))
         out = model(data_in)
         loss = criterion(out, data_out)
         total_loss += loss.item()
-        average_loss = total_loss / ((idx + 1) * config.batch_size)
         loss.backward()
         optimizer.step()
-        tbar.set_description('Epoch %d : loss:%.6f average_loss:%.6f' % (epoch, loss.item(), average_loss))
-    writer.add_scalar('train_loss', average_loss, epoch)
-
+        tbar.set_description('Epoch %d : loss:%.6f total_loss:%.6f' % (epoch, loss.item(), total_loss))
+    if epoch>0:
+        writer.add_scalar('train_loss', total_loss, epoch)
 
 def test(epoch):
-    score = 0
-    total_loss = 0
+    my_loss=My_loss()
+    my_loss.to(device)
     test_loader = DataLoader(dataset=test_data,
                              shuffle=False,
                              drop_last=False,
@@ -201,26 +227,20 @@ def test(epoch):
         tbar = tqdm(test_loader)
         for idx, (data_in, data_out) in enumerate(tbar):
             data_in, data_out = data_in.to(device), data_out.to(device)
-            # h, c = model.init_h_c()
-            # h, c = h.to(device), c.to(device)
-            # out = model(data_in, (h, c))
             out = model(data_in)
+            my_score=my_loss(data_out,out)
             loss = criterion(out, data_out)
-            total_loss += loss.item()
-            mse = total_loss / ((idx + 1) * config.batch_size * config.out_len)
-            score = 1 / (mse + 1)
-            tbar.set_description('Val: loss:%.6f score:%.6f' % (loss.item(), score))
-    writer.add_scalar('test_score', score, epoch)
-    return score
-
-
-def writer_csv(out):
-    with open('result.csv', "w", newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerows(out)
+            tbar.set_description('Val: loss:%.6f score:%.6f' % (loss.item(), my_score))
+    writer.add_scalar('test_score', my_score, epoch)
+    return my_score
 
 
 def pred():
+    def writer_csv(out):
+        with open(f'{config.save_dir}/result.csv', "w", newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerows(out)
+    
     pred_loader = DataLoader(dataset=pred_data,
                              shuffle=False,
                              drop_last=False,
@@ -228,7 +248,6 @@ def pred():
                              batch_size=1)
     out_csv = [['mmsi', 'lat', 'lon']]
     total_loss = 0
-    result = []
     with torch.no_grad():
         tbar = tqdm(pred_loader)
         for idx, (data_in, data_out, mmsi) in enumerate(tbar):
@@ -239,23 +258,14 @@ def pred():
             loss = criterion(out, data_out)
             total_loss += loss.item()
             for lat, lon in out:
-                result.append([lat.item(), lon.item()])
                 lat = str(lat.item())
                 lon = str(lon.item())
                 out_csv.append([str(mmsi.item()), lat, lon])
     
-    ####################################################
-    ####################################################
-    ####################################################
-    mse = total_loss / (len(pred_data) * config.out_len)
+    mse = total_loss / config.out_len
     score = 1 / (mse + 1)
-    print(score)
+    print('pred score：', score)
     writer_csv(out_csv)
-    ####################################################
-    ####################################################
-    ####################################################
-    # writer.add_scalar('pred', average_loss, epoch)
-    return result
 
 
 if __name__ == '__main__':
@@ -266,7 +276,8 @@ if __name__ == '__main__':
 
     best = config.best
     for epoch in range(config.start_epoch, config.start_epoch + config.epochs):
-        # break
+        #break
+        writer.add_scalar('lr', optimizer.state_dict()['param_groups'][0]['lr'], epoch)
         train(epoch)
         if (epoch - config.start_epoch) % 1 == 0:
             score = test(epoch)
@@ -276,7 +287,7 @@ if __name__ == '__main__':
                 print("Save model...")
     pred()
     print('best', best)
-
+    
     torch.save(model.state_dict(), config.pt_path)
     print("Save model...")
 

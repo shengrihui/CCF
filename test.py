@@ -282,13 +282,20 @@ def Score():
     ret_lat=ret['lat']
     ret_lon=ret['lon']
     mse=0
-    for i,j in zip(ret_lon,ans_lon):
-        mse+=(i-j)**2
-    for i,j in zip(ret_lat,ans_lat):
-        mse+=(i-j)**2
-    mse=mse/6
-    score=1/(1+mse)
+    i=0
+    score=0
+    MSE=0
+    for a,b,c,d in zip(ret_lon,ans_lon,ret_lat,ans_lat):
+        mse+=((a-b)**2+(d-c)**2)
+        MSE+=((a-b)**2+(d-c)**2)
+        i+=1
+        if i%6==0:
+            mse/=6
+            score+=1/(1+mse)
+            mse=0
+    score/=60
     print(score)
+    print(1/(MSE/6+1))
     #
     # for i in ret_lon.index:
     #     print(ret_lon[i]-ans_lon[i],ret_lat[i]-ans_lat[i])
@@ -300,7 +307,21 @@ if __name__ == '__main__':
     #compare_train_test_time()
     #split_train_last6()
     #prepare_dataset()
-    Score()
+    #Score()
+    
+    # import csv
+    # with open('result (1).csv','r') as f:
+    #     reader=csv.reader(f)
+    #     res=list(reader)
+    # print(res)
+    # out=[res[0]]
+    # for i in range(1,len(res),6):
+    #     out.append(res[i])
+    # print(out)
+    # with open('result.csv','w',newline='') as f:
+    #     writer=csv.writer(f)
+    #     writer.writerows(out)
+    #
     
     
     

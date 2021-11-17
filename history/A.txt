@@ -12,5 +12,29 @@
 划分出不同的时间段
 
 03
-划分时间段的部分有误，重新修改，之前dataloader里是2843，现在是2819
+划分时间段的部分有误，重新修改，之前dataloader里是2843，现在是1866
 更新计分规则
+
+04
+测试
+
+05
+input_len改为10
+加入自己的计算损失/分数的方法
+
+06
+input_len改为60——大错误！
+
+07
+        self.fc = nn.Sequential(
+            nn.Linear(self.input_len * self.hidden_size, 256),
+            nn.Sigmoid(),
+            nn.Linear(256, 32),
+            nn.Sigmoid(),
+            nn.Linear(32, self.out_len * self.out_size)
+        )
+改变全连接层
+
+input_len = 30
+hidden_size = 20
+num_layers = 4
