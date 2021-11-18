@@ -16,6 +16,7 @@ import time
 import matplotlib.pyplot as plt
 import csv
 
+
 def read_data(mode='train'):
     """
     读取csv数据
@@ -23,25 +24,27 @@ def read_data(mode='train'):
     :return:
     {  mmsi:{ timestamp:[lon,lat,Sog,Cog]}  }
     """
-    data_csv = pd.read_csv('%s.csv' %mode)
+    data_csv = pd.read_csv('%s.csv' % mode)
     data_dict = defaultdict(dict)
     timestamp = data_csv['timestamp']
     lat = data_csv['lat']
     lon = data_csv['lon']
     mmsi = data_csv['mmsi']
-    Sog=data_csv['Sog']
-    Cog=data_csv['Cog']
+    Sog = data_csv['Sog']
+    Cog = data_csv['Cog']
     
     for i in timestamp.index:
-        data_dict[mmsi[i]][timestamp[i]] = [lon[i], lat[i],Sog[i],Cog[i]]
-    #pprint(data_dict)
+        data_dict[mmsi[i]][timestamp[i]] = [lon[i], lat[i], Sog[i], Cog[i]]
+    # pprint(data_dict)
     return data_dict
 
+
 class HTML():
-    def __init__(self,mode='train'):
-        self.data_dict=datas[mode]
-        self.mode=mode
-        self.data_pair=self.make_json()
+    def __init__(self, mode='train'):
+        self.data_dict = datas[mode]
+        self.mode = mode
+        self.data_pair = self.make_json()
+    
     def make_json(self):
         """
         生成绘制Geo时候所需要的json文件
@@ -52,13 +55,13 @@ class HTML():
         for m, time_value in self.data_dict.items():
             js = {}
             for t, v in time_value.items():
-                js[str(t)] = [v[0],v[1]]
-                data_pair[m].append([str(t),  [v[0],v[1]]])
+                js[str(t)] = [v[0], v[1]]
+                data_pair[m].append([str(t), [v[0], v[1]]])
             with open(f'json/{self.mode}_{m}.json', 'w', encoding='utf-8') as f:
                 f.write(json.dumps(js))
         return data_pair
-
-    def Geo_(self,i):
+    
+    def Geo_(self, i):
         geo = (
             Geo(init_opts=opts.InitOpts(width="1600px", height="900px",
                                         ))
@@ -77,30 +80,31 @@ class HTML():
         )
         return geo
     
-
     def html(self):
         tl = Timeline(init_opts=opts.InitOpts(width="1600px", height="900px"))
         for i in self.data_dict.keys():
-             try:
+            try:
                 geo = self.Geo_(i)
                 tl.add(geo, "{}".format(i))
                 print(i, "完成")
-             except:
+            except:
                 print(i, "未完成")
         tl.render(f"html/{self.mode}_line.html")
 
+
 def vis_html():
-    global train_csv,test_csv,train2_csv,datas
+    global train_csv, test_csv, train2_csv, datas
     train_csv = read_data('train')
     test_csv = read_data('test')
     train2_csv = read_data('train2')
     datas = {'train': train_csv, 'test': test_csv, 'train2': train2_csv}
     
     for m in datas:
-        data_html=HTML(m)
+        data_html = HTML(m)
         data_html.html()
 
-#用matpltlib散点图可视化，不太成功
+
+# 用matpltlib散点图可视化，不太成功
 # def plt_vis():
 #     mmsi_list=train_csv.keys()
 #     for mm in mmsi_list:
@@ -147,36 +151,38 @@ def time2str(t):
     otherStyleTime = time.strftime("%Y-%m-%d %H:%M:%S", timeArray)
     return otherStyleTime
 
+
 def time_data(mode='train'):
-    data_csf=pd.read_csv('%s.csv'%mode)
-    data_time=data_csf['timestamp']
-    data_mmsi=data_csf['mmsi']
-    r,c=data_csf.shape
-    start=0
-    time_dict=defaultdict(list)
-    while start<r:
-        mm=data_mmsi[start]
-        end=start+1
-        while end<r:
-            if end==r-1 or \
-                    data_mmsi[end]!=data_mmsi[start] or \
-                    int(data_time[end])-int(data_time[end-1])>1000:
-                t0=time2str(int(data_time[start]))
+    data_csf = pd.read_csv('%s.csv' % mode)
+    data_time = data_csf['timestamp']
+    data_mmsi = data_csf['mmsi']
+    r, c = data_csf.shape
+    start = 0
+    time_dict = defaultdict(list)
+    while start < r:
+        mm = data_mmsi[start]
+        end = start + 1
+        while end < r:
+            if end == r - 1 or \
+                    data_mmsi[end] != data_mmsi[start] or \
+                    int(data_time[end]) - int(data_time[end - 1]) > 1000:
+                t0 = time2str(int(data_time[start]))
                 t2 = time2str(int(data_time[end]))
-                t1 = time2str(int(data_time[end-1]))
-                #print(mm,t0,t1,end-start,end-1,start)
-                time_dict[mm].append([t0,t1,end-start])
+                t1 = time2str(int(data_time[end - 1]))
+                # print(mm,t0,t1,end-start,end-1,start)
+                time_dict[mm].append([t0, t1, end - start])
                 break
-            end+=1
-        #print()
-        start=end
+            end += 1
+        # print()
+        start = end
     return time_dict
 
+
 def compare_train_test_time():
-    train_time=time_data()
+    train_time = time_data()
     print('test')
-    test_time=time_data('test')
-    for i in range(87,36,-1):
+    test_time = time_data('test')
+    for i in range(87, 36, -1):
         print(i)
         print('train')
         for j in train_time[i]:
@@ -184,22 +190,23 @@ def compare_train_test_time():
         print('test')
         for j in test_time[i]:
             print(j)
-    
+
+
 def split_train_last6():
     with open('train.csv', 'r') as f:
         reader = csv.reader(f)
         result = list(reader)
-    out=[['mmsi','lat','lon']]
-    pre=0
-    for idx in range(1,len(result)):
-        mm=int(result[idx][0])
-        if mm>27 and mm!=pre :
-            pre=mm
-            for i in range(idx-6,idx):
+    out = [['mmsi', 'lat', 'lon']]
+    pre = 0
+    for idx in range(1, len(result)):
+        mm = int(result[idx][0])
+        if mm > 27 and mm != pre:
+            pre = mm
+            for i in range(idx - 6, idx):
                 out.append(result[i][:3])
     for i in range(len(result) - 6, len(result)):
         out.append(result[i][:3])
-
+    
     with open('answer.csv', "w", newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(out)
@@ -211,32 +218,42 @@ def prepare_dataset():
     from collections import defaultdict
     from pprint import pprint
     train_csv = pd.read_csv('train.csv')
+    print(train_csv['lat'].describe())
+    print()
+    print(train_csv['lon'].describe())
+    
+    print()
+    print(train_csv['Sog'].describe())
+    
+    print()
+    print(train_csv['Cog'].describe())
+    exit()
     mmsi = train_csv['mmsi']
     lat = train_csv['lat']
     lon = train_csv['lon']
     sog = train_csv['Sog']
     cog = train_csv['Cog']
-    time=train_csv['timestamp']
+    time = train_csv['timestamp']
     mmsi_dict = defaultdict(list)
     for i in range(len(mmsi)):
-        mmsi_dict[mmsi[i]].append([lat[i], lon[i], sog[i], cog[i],time[i]])
+        mmsi_dict[mmsi[i]].append([lat[i], lon[i], sog[i], cog[i], time[i]])
     _data = []
     _pred = []
     
-    def spllit_each_mmsi(data,m=0):
+    def spllit_each_mmsi(data, m=0):
         ret = []
         for i in range(len(data) - 45):
             try:
-                if abs(data[i+46][4]-data[i+46+1][4])>100:
+                if abs(data[i + 46][4] - data[i + 46 + 1][4]) > 100:
                     continue
             except:
                 pass
             cell_in = data[i:i + 40][:3]
             cell_out = [[data[j][0], data[j][1]] for j in range(i + 40, i + 46)]
-            if m<27:
+            if m < 27:
                 ret.append([cell_in, cell_out])
-            elif m>=27:
-                ret.append([cell_in, cell_out,m])
+            elif m >= 27:
+                ret.append([cell_in, cell_out, m])
         return ret
     
     for m in mmsi_dict:
@@ -244,16 +261,16 @@ def prepare_dataset():
             _data.extend(spllit_each_mmsi(mmsi_dict[m]))
         elif m >= 27:
             _data.extend(spllit_each_mmsi(mmsi_dict[m][:-46]))
-            _pred.extend(spllit_each_mmsi(mmsi_dict[m][-46:],m))
-    
-    #pprint(_data[0])
+            _pred.extend(spllit_each_mmsi(mmsi_dict[m][-46:], m))
+
+    # pprint(_data[0])
     pprint(_pred[-1][1])
     print(lat[-6:])
-    
-    #exit(0)
+
+    # exit(0)
     # data_list_4 = list(chain.from_iterable(zip(lat, lon, sog, cog)))
     # data1 = [data_list_4[i:i + n] for i in range(0, len(data_list), 4)]
-
+    
     # def sepmmsi():
     #     for i in mmsidata:
     #         while i == 1:
@@ -274,54 +291,54 @@ def prepare_dataset():
     #             list_i.pop(cog)
     #     return list_i
 
+
 def Score():
-    ans=pd.read_csv('answer.csv')
-    ret=pd.read_csv('result.csv')
-    ans_lat=ans['lat']
-    ans_lon=ans['lon']
-    ret_lat=ret['lat']
-    ret_lon=ret['lon']
-    mse=0
-    i=0
-    score=0
-    MSE=0
-    for a,b,c,d in zip(ret_lon,ans_lon,ret_lat,ans_lat):
-        mse+=((a-b)**2+(d-c)**2)
-        MSE+=((a-b)**2+(d-c)**2)
-        i+=1
-        if i%6==0:
-            mse/=6
-            score+=1/(1+mse)
-            mse=0
-    score/=60
+    ans = pd.read_csv('answer.csv')
+    ret = pd.read_csv('result.csv')
+    ans_lat = ans['lat']
+    ans_lon = ans['lon']
+    ret_lat = ret['lat']
+    ret_lon = ret['lon']
+    mse = 0
+    i = 0
+    score = 0
+    MSE = 0
+    for a, b, c, d in zip(ret_lon, ans_lon, ret_lat, ans_lat):
+        mse += ((a - b) ** 2 + (d - c) ** 2)
+        MSE += ((a - b) ** 2 + (d - c) ** 2)
+        i += 1
+        if i % 6 == 0:
+            mse /= 6
+            score += 1 / (1 + mse)
+            mse = 0
+    score /= 60
     print(score)
-    print(1/(MSE/6+1))
+    print(1 / (MSE / 6 + 1))
     #
     # for i in ret_lon.index:
     #     print(ret_lon[i]-ans_lon[i],ret_lat[i]-ans_lat[i])
-    
+
+
 def make_answer2():
-    with open('answer.csv','r') as f:
-        reader=csv.reader(f)
-        ans_csv=list(reader)
-    out=[ans_csv[0]]
+    with open('answer.csv', 'r') as f:
+        reader = csv.reader(f)
+        ans_csv = list(reader)
+    out = [ans_csv[0]]
     for m, a, b in ans_csv[1:]:
-        aa=float(a)*1.000000000123
-        bb = float(b) * (1+1.123*10**7)
-        out.append([m,str(aa),str(bb)])
-    with open('answer2.csv','w') as f:
-        writer=csv.writer(f)
+        aa = float(a) * 1.000000000123
+        bb = float(b) * (1 + 1.123 * 10 ** -7)
+        out.append([m, str(aa), str(bb)])
+    with open('answer2.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
         writer.writerows(out)
-        
-    
-    
-    
+
+
 if __name__ == '__main__':
-    #vis_html()
-    #compare_train_test_time()
-    #plit_train_last6()
-    #prepare_dataset()
-    #Score()
+    # vis_html()
+    # compare_train_test_time()
+    # plit_train_last6()
+    # prepare_dataset()
+    # Score()
     
     # import csv
     # with open('result (1).csv','r') as f:
@@ -338,6 +355,6 @@ if __name__ == '__main__':
     #
     
     make_answer2()
-    
-    
+
+
 

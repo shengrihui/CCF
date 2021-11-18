@@ -46,3 +46,8 @@ batch_size = 2
 input_len = 20
 scheduler =torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max',0.25,10)
 增加动态调整学习率
+
+09
+数据归一化
+减少一层线性层
+
