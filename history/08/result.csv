@@ -1,0 +1,6 @@
+"tensor(30.3931, device='cuda:0', dtype=torch.float64)","tensor(121.8139, device='cuda:0', dtype=torch.float64)"
+"tensor(30.3932, device='cuda:0', dtype=torch.float64)","tensor(121.8139, device='cuda:0', dtype=torch.float64)"
+"tensor(30.3932, device='cuda:0', dtype=torch.float64)","tensor(121.8140, device='cuda:0', dtype=torch.float64)"
+"tensor(30.3932, device='cuda:0', dtype=torch.float64)","tensor(121.8141, device='cuda:0', dtype=torch.float64)"
+"tensor(30.3932, device='cuda:0', dtype=torch.float64)","tensor(121.8141, device='cuda:0', dtype=torch.float64)"
+"tensor(30.3932, device='cuda:0', dtype=torch.float64)","tensor(121.8142, device='cuda:0', dtype=torch.float64)"
