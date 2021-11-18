@@ -14,6 +14,7 @@ from pyecharts.charts import Geo, Timeline
 from pyecharts import options as opts
 import time
 import matplotlib.pyplot as plt
+import csv
 
 def read_data(mode='train'):
     """
@@ -185,7 +186,6 @@ def compare_train_test_time():
             print(j)
     
 def split_train_last6():
-    import csv
     with open('train.csv', 'r') as f:
         reader = csv.reader(f)
         result = list(reader)
@@ -200,7 +200,7 @@ def split_train_last6():
     for i in range(len(result) - 6, len(result)):
         out.append(result[i][:3])
 
-    with open('result.csv', "w", newline='') as csvfile:
+    with open('answer.csv', "w", newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(out)
 
@@ -300,12 +300,26 @@ def Score():
     # for i in ret_lon.index:
     #     print(ret_lon[i]-ans_lon[i],ret_lat[i]-ans_lat[i])
     
+def make_answer2():
+    with open('answer.csv','r') as f:
+        reader=csv.reader(f)
+        ans_csv=list(reader)
+    out=[ans_csv[0]]
+    for m, a, b in ans_csv[1:]:
+        aa=float(a)*1.000000000123
+        bb = float(b) * (1+1.123*10**7)
+        out.append([m,str(aa),str(bb)])
+    with open('answer2.csv','w') as f:
+        writer=csv.writer(f)
+        writer.writerows(out)
+        
+    
     
     
 if __name__ == '__main__':
     #vis_html()
     #compare_train_test_time()
-    #split_train_last6()
+    #plit_train_last6()
     #prepare_dataset()
     #Score()
     
@@ -323,6 +337,7 @@ if __name__ == '__main__':
     #     writer.writerows(out)
     #
     
+    make_answer2()
     
     
 

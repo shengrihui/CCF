@@ -22,21 +22,22 @@ class Config():
     input_size = 4
     # 输出维度2，精度纬度
     out_size = 2
-    batch_size = 4
-    hidden_size = 20
-    num_layers = 4
+    batch_size = 2
+    hidden_size = 40
+    num_layers = 3
     out_len = 6  # 预测长度10
-    input_len = 30  # 输入长度
+    input_len = 20  # 输入长度
     data_len = out_len + input_len
     
-    lr = 0.000002
+    lr = 0.00000001
     momentum = 0.8
-    start_epoch = 100
-    epochs = 20
-    save_dir = '07'
+    start_epoch = 201
+    epochs = 150
+    save_dir = '08'
     pt_path = f'{save_dir}/model.pt'
     logs = f'{save_dir}/logs/'
-    best =0.8900048504834401
+    best = 0.8781318871147716
+    pred_best = 0.77
 
 config = Config()
 if not os.path.exists(config.save_dir):
@@ -185,7 +186,7 @@ class My_loss(nn.Module):
 
 criterion = nn.MSELoss(reduction='sum')
 optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-
+scheduler =torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max',0.1,20)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = torch.device('cpu')
 model.double()
@@ -235,9 +236,9 @@ def test(epoch):
     return my_score
 
 
-def pred():
-    def writer_csv(out):
-        with open(f'{config.save_dir}/result.csv', "w", newline='') as csvfile:
+def pred(best_pred,epoch):
+    def write_csv(out,path):
+        with open(path, "w", newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerows(out)
     
@@ -265,7 +266,12 @@ def pred():
     mse = total_loss / config.out_len
     score = 1 / (mse + 1)
     print('pred score：', score)
-    writer_csv(out_csv)
+    writer.add_scalar('pred_score', score, epoch)
+    write_csv(out_csv, f'{config.save_dir}/result_{epoch}_{score}.csv')
+    if score>config.pred_best:
+        print('save result..')
+        write_csv(out,f'{config.save_dir}/result.csv')
+    return score
 
 
 if __name__ == '__main__':
@@ -275,6 +281,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(config.logs)
 
     best = config.best
+    best_pred=0
     for epoch in range(config.start_epoch, config.start_epoch + config.epochs):
         #break
         writer.add_scalar('lr', optimizer.state_dict()['param_groups'][0]['lr'], epoch)
@@ -285,7 +292,8 @@ if __name__ == '__main__':
                 best = score
                 torch.save(model.state_dict(), config.pt_path)
                 print("Save model...")
-    pred()
+        p_score=pred(best_pred,epoch)
+        scheduler.step(p_score)
     print('best', best)
     
     torch.save(model.state_dict(), config.pt_path)

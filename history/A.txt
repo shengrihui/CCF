@@ -38,3 +38,11 @@ input_len改为60——大错误！
 input_len = 30
 hidden_size = 20
 num_layers = 4
+
+08
+batch_size = 2
+    hidden_size = 40
+    num_layers = 3
+input_len = 20
+scheduler =torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max',0.25,10)
+增加动态调整学习率
