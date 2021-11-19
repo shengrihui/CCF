@@ -51,3 +51,7 @@ scheduler =torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max',0.25,10)
 数据归一化
 减少一层线性层
 
+10
+input_len  =15
+hidden_size = 40
+batch_size = 4

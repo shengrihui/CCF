@@ -22,11 +22,11 @@ class Config():
     input_size = 4
     # 输出维度2，精度纬度
     out_size = 2
-    batch_size = 2
-    hidden_size = 40
+    batch_size = 4
+    hidden_size = 30
     num_layers = 3
     out_len = 6  # 预测长度10
-    input_len = 20  # 输入长度
+    input_len = 15  # 输入长度
     data_len = out_len + input_len
 
     normalization = {
@@ -36,15 +36,16 @@ class Config():
         'Sog': {'min': 1.100000,'max': 36.000000}
     }
 
-    lr = 0.002
-    momentum = 0.8
-    start_epoch = 77
-    epochs = 80
-    save_dir = '09'
-    pt_path = f'{save_dir}/model.pt'
+    lr = 0.0002
+    momentum = 0.9
+    start_epoch = 453
+    epochs = 10
+    save_dir = '10'
+    
+    pt_path = f'{save_dir}/model_34.pt'
     logs = f'{save_dir}/logs/'
-    best = 0.9571504826928664
-    pred_best = 0.9360867377632831
+    best = 0.983561
+    pred_best = 0.979899
 
 
 config = Config()
@@ -215,8 +216,10 @@ class My_loss(nn.Module):
 
 criterion = nn.MSELoss(reduction='sum')
 optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, 'max', 0.1, 10)
+# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+#     optimizer, 'max', 0.1, 10)
+#scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[15,35,60], gamma=0.4)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=3,T_mult=2,eta_min=0)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = torch.device('cpu')
 model.double()
@@ -287,23 +290,22 @@ def pred(best_pred, epoch):
         for idx, (data_in, data_out, mmsi) in enumerate(tbar):
             data_in, data_out = data_in.to(device), data_out.to(device)
             out = model(data_in)
-            tbar.set_description('Pred...')
             out = torch.squeeze(out)
             loss = criterion(out, data_out)
             total_loss += loss.item()
+            mse = total_loss / config.out_len
+            score = 1 / (mse + 1)
+            tbar.set_description('Pred score:%f...'%score)
             for lat, lon in out:
                 lat = str(Data_Normalization.n2data(lat.item(), 'lat'))
                 lon = str(Data_Normalization.n2data(lon.item(), 'lon'))
                 out_csv.append([str(mmsi.item()), lat, lon])
-
-    mse = total_loss / config.out_len
-    score = 1 / (mse + 1)
-    print('pred score：', score)
+    #print('pred score：', score)
     writer.add_scalar('pred_score', score, epoch)
     write_csv(out_csv, f'{config.save_dir}/result_{epoch}_{score}.csv')
     if score > best_pred:
         print('save result..')
-        write_csv(out, f'{config.save_dir}/result.csv')
+        write_csv(out, f'{config.save_dir}/result_{epoch}.csv')
     return score
 
 
@@ -313,6 +315,8 @@ if __name__ == '__main__':
     pred_data = CCFData('pred')
     writer = SummaryWriter(config.logs)
 
+    
+    exit(0)
     best = config.best
     best_pred = config.pred_best
     p_score=best_pred
@@ -325,15 +329,16 @@ if __name__ == '__main__':
             score = test(epoch)
             if score > best:
                 best = score
-                torch.save(model.state_dict(), config.pt_path)
+                torch.save(model.state_dict(), f'{config.save_dir}/model_{epoch}.pt')
                 print("Save model...")
         p= pred(p_score, epoch)
         if p>p_score:
             p_score=p
         
-        scheduler.step(p_score)
+        #scheduler.step(p_score)
+        scheduler.step()
     print('best', best)
     print('best_pred',p_score)
 
-    #torch.save(model.state_dict(), config.pt_path)
-    #print("Save model...")
+    torch.save(model.state_dict(), f'{config.save_dir}/model_last.pt')
+    print("Save model...")
