@@ -53,5 +53,11 @@ scheduler =torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max',0.25,10)
 
 10
 input_len  =15
-hidden_size = 40
+hidden_size = 30
 batch_size = 4
+
+11
+input_len  =12
+改变存储、数据的存储
+fc层中间32改为60
+
